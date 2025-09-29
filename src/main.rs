@@ -3,32 +3,114 @@ use chess;
 
 
 use ggez::{conf, event, graphics, Context, ContextBuilder, GameError, GameResult};
-use std::{collections::HashMap, env, path};
+use std::{collections::HashMap, env, path, fmt::{self}};
 
 /// A chess board is 8x8 tiles.
 const GRID_SIZE: u8 = 8;
 /// Suitable size of each tile.
-const GRID_CELL_SIZE: (i16, i16) = (90, 90);
+const GRID_CELL_SIZE: (u16, u16) = (90, 90);
 
 /// Size of the application window.
 const SCREEN_SIZE: (f32, f32) = (
-    GRID_SIZE as f32 * GRID_CELL_SIZE.0 as f32, // window width
+    (GRID_SIZE as f32 * GRID_CELL_SIZE.0 as f32) * 1.75, // window width
     GRID_SIZE as f32 * GRID_CELL_SIZE.1 as f32, // window height
 );
 
 // GUI Color representations
-const BLACK: graphics::Color =
-    graphics::Color::new(228.0 / 255.0, 196.0 / 255.0, 108.0 / 255.0, 1.0);
 const WHITE: graphics::Color =
-    graphics::Color::new(188.0 / 255.0, 140.0 / 255.0, 76.0 / 255.0, 1.0);
+    graphics::Color::new(250.0 / 255.0, 240.0 / 255.0, 222.0 / 255.0, 1.0);
+const BLACK: graphics::Color =
+    graphics::Color::new(236.0 / 255.0, 95.0 / 255.0, 153.0 / 255.0, 1.0);
 
 // GUI logic and event implementation structure.
-struct Game {
 
+
+struct Game {
+    fen: String,
+    turn: char,
+    board: Vec<Vec<char>>,
+}
+impl Game {
+    fn parse_fen(fen: String) -> Game {
+        let fen_vec = fen.split(' ').collect::<Vec<&str>>();
+        //Split the FEN into its constituent parts
+
+        let board_state_vec = fen_vec[0].split('/').collect::<Vec<&str>>();
+        let mut row = vec![];
+        let mut board_state = vec![];
+        for single_row in board_state_vec {
+            for character in single_row.chars() {
+                //assuming valid FEN (only characters and numbers)
+                const RADIX: u32 = 10;
+                if character.is_numeric() {
+                    for _i in 0..character
+                        .to_digit(RADIX)
+                        .expect("Could not convert char to int")
+                    {
+                        row.push('*');
+                    }
+                } else {
+                    row.push(character);
+                }
+            }
+            board_state.push(row.clone());
+            row.retain(|_x| false); // empty the vector
+        }
+        Game {
+            fen: fen.clone(),
+            turn: fen_vec[1].chars().collect::<Vec<char>>()[0],
+            board: board_state
+        }
+    }
+
+    fn update_fen(&mut self, fen: String) {
+        let fen_vec = fen.split(' ').collect::<Vec<&str>>();
+        //Split the FEN into its constituent parts
+
+        let board_state_vec = fen_vec[0].split('/').collect::<Vec<&str>>();
+        let mut row = vec![];
+        let mut board_state = vec![];
+        for single_row in board_state_vec {
+            for character in single_row.chars() {
+                //assuming valid FEN (only characters and numbers)
+                const RADIX: u32 = 10;
+                if character.is_numeric() {
+                    for _i in 0..character
+                        .to_digit(RADIX)
+                        .expect("Could not convert char to int")
+                    {
+                        row.push('*');
+                    }
+                } else {
+                    row.push(character);
+                }
+            }
+            board_state.push(row.clone());
+            row.retain(|_x| false); // empty the vector
+        }
+        self.fen = fen.clone();
+        self.turn = fen_vec[1].chars().collect::<Vec<char>>()[0];
+        self.board = board_state;
+    }
+    fn new() -> Game {
+        Self::parse_fen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string())
+    }    
+}
+impl fmt::Debug for Game {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let mut board_state_string = String::new();
+        for i in &self.board {
+            board_state_string = format!("{}\n{:?}", board_state_string, i);
+        }
+        write!(
+            f,
+            "Current FEN: {}\n Current turn: {}\n Current board state: {}",
+            self.fen, self.turn, board_state_string,
+        )
+    }
 }
 struct AppState {
-    sprites: HashMap<(char, char), graphics::Image>, // For easy access to the apropriate PNGs
-    fen: String, // Or whatever way you prefer to represent the board
+    sprites: HashMap<char, graphics::Image>, // For easy access to the apropriate PNGs
     game: Game, // Save piece positions, which tiles has been clicked, current colour, etc...
 }
 
@@ -36,20 +118,8 @@ impl AppState {
     // Initialise new application, i.e. initialise new game and load resources.
     fn new(ctx: &mut Context) -> GameResult<AppState> {
 
-        let fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1".to_string();
-
         let state = AppState {
             sprites: AppState::load_sprites(ctx),
-            board: [
-                royal_rank(Colour::Black),
-                pawn_rank(Colour::Black),
-                empty_rank(),
-                empty_rank(),
-                empty_rank(),
-                empty_rank(),
-                pawn_rank(Colour::White),
-                royal_rank(Colour::White),
-            ],
             game: Game::new(),
         };
 
@@ -57,27 +127,27 @@ impl AppState {
     }
     #[rustfmt::skip] // Skips formatting on this function (not recommended)
                      /// Loads chess piese images into hashmap, for ease of use.
-    fn load_sprites(ctx: &mut Context) -> HashMap<(Colour, PieceType), graphics::Image> {
+    fn load_sprites(ctx: &mut Context) -> HashMap<char, graphics::Image> {
 
         [
-            ((Colour::Black, PieceType::King), "/black_king.png".to_string()),
-            ((Colour::Black, PieceType::Queen), "/black_queen.png".to_string()),
-            ((Colour::Black, PieceType::Rook), "/black_rook.png".to_string()),
-            ((Colour::Black, PieceType::Pawn), "/black_pawn.png".to_string()),
-            ((Colour::Black, PieceType::Bishop), "/black_bishop.png".to_string()),
-            ((Colour::Black, PieceType::Knight), "/black_knight.png".to_string()),
-            ((Colour::White, PieceType::King), "/white_king.png".to_string()),
-            ((Colour::White, PieceType::Queen), "/white_queen.png".to_string()),
-            ((Colour::White, PieceType::Rook), "/white_rook.png".to_string()),
-            ((Colour::White, PieceType::Pawn), "/white_pawn.png".to_string()),
-            ((Colour::White, PieceType::Bishop), "/white_bishop.png".to_string()),
-            ((Colour::White, PieceType::Knight), "/white_knight.png".to_string())
+            (('k'), "/black_king.png".to_string()),
+            (('q'), "/black_queen.png".to_string()),
+            (('r'), "/black_rook.png".to_string()),
+            (('p'), "/black_pawn.png".to_string()),
+            (('b'), "/black_bishop.png".to_string()),
+            (('n'), "/black_knight.png".to_string()),
+            (('K'), "/white_king.png".to_string()),
+            (('Q'), "/white_queen.png".to_string()),
+            (('R'), "/white_rook.png".to_string()),
+            (('P'), "/white_pawn.png".to_string()),
+            (('B'), "/white_bishop.png".to_string()),
+            (('N'), "/white_knight.png".to_string())
         ]
             .iter()
             .map(|(piece, path)| {
                 (*piece, graphics::Image::new(ctx, path).unwrap())
             })
-            .collect::<HashMap<(Colour, PieceType), graphics::Image>>()
+            .collect::<HashMap<char, graphics::Image>>()
     }
 }
 
@@ -96,13 +166,13 @@ impl event::EventHandler<GameError> for AppState {
 
         // create text representation
         let state_text = graphics::Text::new(
-            graphics::TextFragment::from(format!("Game is {:?}.", self.game.get_game_state()))
+            graphics::TextFragment::from(format!("{:?}", self.game))
                 .scale(graphics::PxScale { x: 30.0, y: 30.0 }),
         );
 
         // get size of text
         let text_dimensions = state_text.dimensions(ctx);
-        // create background rectangle with white coulouring
+        // create background rectangle with OFF BLACK coulouring
         let background_box = graphics::Mesh::new_rectangle(
             ctx,
             graphics::DrawMode::fill(),
@@ -112,7 +182,7 @@ impl event::EventHandler<GameError> for AppState {
                 text_dimensions.w as f32 + 16.0,
                 text_dimensions.h as f32,
             ),
-            [1.0, 1.0, 1.0, 1.0].into(),
+            [33.0/255.0, 33.0/255.0, 33.0/255.0, 1.0].into(),
         )?;
 
         // draw background
@@ -154,10 +224,10 @@ impl event::EventHandler<GameError> for AppState {
                     .expect("Failed to draw tiles.");
 
                 // draw piece
-                if let Some(piece) = self.board[row as usize][col as usize] {
+                if self.game.board[row as usize][col as usize] != '*' {
                     graphics::draw(
                         ctx,
-                        self.sprites.get(&piece).unwrap(),
+                        self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
                         graphics::DrawParam::default()
                             .scale([2.0, 2.0]) // Tile size is 90 pixels, while image sizes are 45 pixels.
                             .dest([
@@ -210,7 +280,7 @@ pub fn main() -> GameResult {
         .add_resource_path(resource_dir) // Import image files to GGEZ
         .window_setup(
             conf::WindowSetup::default()
-                .title("Schack") // Set window title "Schack"
+                .title("BestDamnSchackMonitor (BDSM)") // Set window title
                 .icon("/icon.png"), // Set application icon
         )
         .window_mode(
@@ -222,4 +292,4 @@ pub fn main() -> GameResult {
 
     let state = AppState::new(&mut contex).expect("Failed to create state.");
     event::run(contex, event_loop, state) // Run window event loop
-}
+    }
