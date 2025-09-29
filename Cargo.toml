@@ -1,0 +1,9 @@
+[package]
+name = "alviny-task-5"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+chess = { git = "https://github.com/TheOneTEM/viggoca-task-3.git", branch = "main"}
+linked-hash-map = "0.5.4" 
+ggez = "0.6.1"
