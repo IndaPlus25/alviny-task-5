@@ -241,14 +241,16 @@ impl event::EventHandler<GameError> for AppState {
         }
 
         // draw text with dark gray colouring and center position
+        const F7: f32 = 0.96862745;
         graphics::draw(
             ctx,
+            
             &state_text,
             graphics::DrawParam::default()
-                .color([0.0, 0.0, 0.0, 1.0].into())
+                .color([F7, F7, F7, 1.0].into())
                 .dest(ggez::mint::Point2 {
                     x: (SCREEN_SIZE.0 - text_dimensions.w as f32) / 2f32 as f32,
-                    y: (SCREEN_SIZE.0 - text_dimensions.h as f32) / 2f32 as f32,
+                    y: (SCREEN_SIZE.1 - text_dimensions.h as f32) / 2f32 as f32,
                 }),
         )
         .expect("Failed to draw text.");
