@@ -1,8 +1,6 @@
-use chess;
+use chess::game_turn;
 
-
-
-use ggez::{conf, event, graphics, Context, ContextBuilder, GameError, GameResult};
+use ggez::{conf, event, graphics, Context, ContextBuilder, GameError, GameResult, input::mouse};
 use std::{collections::HashMap, env, path, fmt::{self}};
 
 /// A chess board is 8x8 tiles.
@@ -12,7 +10,7 @@ const GRID_CELL_SIZE: (u16, u16) = (90, 90);
 
 /// Size of the application window.
 const SCREEN_SIZE: (f32, f32) = (
-    (GRID_SIZE as f32 * GRID_CELL_SIZE.0 as f32) * 1.75, // window width
+    ((6.0 + GRID_SIZE as f32) * GRID_CELL_SIZE.0 as f32), // window width
     GRID_SIZE as f32 * GRID_CELL_SIZE.1 as f32, // window height
 );
 
@@ -25,12 +23,19 @@ const BLACK: graphics::Color =
 // GUI logic and event implementation structure.
 
 
+fn get_algebraic_notation(x_pos: i32, y_pos: i32) -> String {
+    let col_names = "abcdefgh".to_string();
+    let col_name = col_names.chars().nth(x_pos as usize).expect("Blimey! Unable to find this col!");
+    format!("{}{}", col_name, 8 - y_pos)
+}
+
 struct Game {
     fen: String,
     turn: char,
     board: Vec<Vec<char>>,
 }
 impl Game {
+    
     fn parse_fen(fen: String) -> Game {
         let fen_vec = fen.split(' ').collect::<Vec<&str>>();
         //Split the FEN into its constituent parts
@@ -104,14 +109,15 @@ impl fmt::Debug for Game {
         }
         write!(
             f,
-            "Current FEN: {}\n Current turn: {}\n Current board state: {}",
+            "Current FEN: {}\nCurrent turn: {}\nCurrent board state: {}",
             self.fen, self.turn, board_state_string,
         )
     }
 }
 struct AppState {
     sprites: HashMap<char, graphics::Image>, // For easy access to the apropriate PNGs
-    game: Game, // Save piece positions, which tiles has been clicked, current colour, etc...
+    game: Game,
+    piece_picked_up: Vec<i32>,
 }
 
 impl AppState {
@@ -121,6 +127,7 @@ impl AppState {
         let state = AppState {
             sprites: AppState::load_sprites(ctx),
             game: Game::new(),
+            piece_picked_up: vec![],
         };
 
         Ok(state)
@@ -166,19 +173,20 @@ impl event::EventHandler<GameError> for AppState {
 
         // create text representation
         let state_text = graphics::Text::new(
-            graphics::TextFragment::from(format!("{:?}", self.game))
-                .scale(graphics::PxScale { x: 30.0, y: 30.0 }),
+            graphics::TextFragment::from(format!("Debug information:\n{:?}", self.game))
+                .scale(graphics::PxScale { x: 15.0, y: 15.0 }),
         );
 
         // get size of text
         let text_dimensions = state_text.dimensions(ctx);
+        let text_position = [(SCREEN_SIZE.0 - text_dimensions.w as f32), (SCREEN_SIZE.1 - text_dimensions.h as f32)];
         // create background rectangle with OFF BLACK coulouring
         let background_box = graphics::Mesh::new_rectangle(
             ctx,
             graphics::DrawMode::fill(),
             graphics::Rect::new(
-                (SCREEN_SIZE.0 - text_dimensions.w as f32) / 2f32 as f32 - 8.0,
-                (SCREEN_SIZE.0 - text_dimensions.h as f32) / 2f32 as f32,
+                text_position[0],
+                text_position[1],
                 text_dimensions.w as f32 + 16.0,
                 text_dimensions.h as f32,
             ),
@@ -223,24 +231,68 @@ impl event::EventHandler<GameError> for AppState {
                 graphics::draw(ctx, &rectangle, graphics::DrawParam::default())
                     .expect("Failed to draw tiles.");
 
-                // draw piece
+                
+            }
+        }
+        
+        // draw pieces
+        for row in 0..8 {
+            for col in 0..8 {
                 if self.game.board[row as usize][col as usize] != '*' {
-                    graphics::draw(
-                        ctx,
-                        self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
-                        graphics::DrawParam::default()
-                            .scale([2.0, 2.0]) // Tile size is 90 pixels, while image sizes are 45 pixels.
-                            .dest([
-                                col as f32 * GRID_CELL_SIZE.0 as f32,
-                                row as f32 * GRID_CELL_SIZE.1 as f32,
-                            ]),
-                    )
-                    .expect("Failed to draw piece.");
+                    let mut x_pos = col as f32 * GRID_CELL_SIZE.0 as f32;
+                    let mut y_pos = row as f32 * GRID_CELL_SIZE.1 as f32;
+                    if !self.piece_picked_up.is_empty() {
+                        if col != self.piece_picked_up[0] || row != self.piece_picked_up[1] {
+                            graphics::draw(
+                                ctx,
+                                self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
+                                graphics::DrawParam::default()
+                                    .scale([2.0, 2.0]) // Tile size is 90 pixels, while image sizes are 45 pixels.
+                                    .dest([
+                                        x_pos,
+                                        y_pos,
+                                    ]),
+                            ).expect("Failed to draw piece.");
+                        }
+                    } else {
+                        graphics::draw(
+                            ctx,
+                            self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
+                            graphics::DrawParam::default()
+                                .scale([2.0, 2.0]) // Tile size is 90 pixels, while image sizes are 45 pixels.
+                                .dest([
+                                    x_pos,
+                                    y_pos,
+                                ]),
+                        )
+                        .expect("Failed to draw piece.");
+                    }
                 }
             }
         }
-
-        // draw text with dark gray colouring and center position
+        // draw picked up piece last
+        if !self.piece_picked_up.is_empty() {
+            for row in 0..8 {
+                for col in 0..8 {
+                    if col == self.piece_picked_up[0] && row == self.piece_picked_up[1] {
+                        let mouse_position = mouse::position(ctx);
+                        let x_pos = mouse_position.x - 20.0;
+                        let y_pos = mouse_position.y - 20.0;
+                        graphics::draw(
+                            ctx,
+                            self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
+                            graphics::DrawParam::default()
+                                .scale([2.0, 2.0]) // Tile size is 90 pixels, while image sizes are 45 pixels.
+                                .dest([
+                                    x_pos,
+                                    y_pos,
+                                ]),
+                        ).expect("Failed to draw picked up piece.");
+                    }
+                }
+            }
+        }
+        // draw text with off white colouring and center position
         const F7: f32 = 0.96862745;
         graphics::draw(
             ctx,
@@ -249,8 +301,8 @@ impl event::EventHandler<GameError> for AppState {
             graphics::DrawParam::default()
                 .color([F7, F7, F7, 1.0].into())
                 .dest(ggez::mint::Point2 {
-                    x: (SCREEN_SIZE.0 - text_dimensions.w as f32) / 2f32 as f32,
-                    y: (SCREEN_SIZE.1 - text_dimensions.h as f32) / 2f32 as f32,
+                    x: text_position[0],
+                    y: text_position[1],
                 }),
         )
         .expect("Failed to draw text.");
@@ -269,8 +321,26 @@ impl event::EventHandler<GameError> for AppState {
         x: f32,
         y: f32,
     ) {
+        let pos = mouse::position(ctx);
+        let board_pos_x = (pos.x / GRID_CELL_SIZE.0 as f32).floor() as i32;
+        let board_pos_y = (pos.y / GRID_CELL_SIZE.0 as f32).floor() as i32;
         if button == event::MouseButton::Left {
-            /* check click position and update board accordingly */
+            
+            if board_pos_x <= 7 { // this means that the click was within board boundaries
+                println!("x coordinate: {}, y coordinate: {}, algebraic notation: {}", board_pos_x, board_pos_y, get_algebraic_notation(board_pos_x, board_pos_y));
+                if self.piece_picked_up.is_empty() { // This means a piece hasnt been picked up
+                    self.piece_picked_up = vec![board_pos_x, board_pos_y]; // set piece picked up flag
+                } else { // only run if a piece has been picked up
+                    let algebraic_coordinate_source = get_algebraic_notation(self.piece_picked_up[0], self.piece_picked_up[1]);
+                    let algebraic_coordinate_target  = get_algebraic_notation(board_pos_x, board_pos_y);
+                    let action = format!("{} {}", algebraic_coordinate_source, algebraic_coordinate_target);
+                    println!("Action taken: {}", action);
+                    self.game.update_fen(game_turn(self.game.fen.clone(), action));
+                    self.piece_picked_up.retain(|_| false); //empty the vector
+                }
+            } else {
+                // TODO: Implement other buttons here
+            }
         }
     }
 }
@@ -283,7 +353,7 @@ pub fn main() -> GameResult {
         .window_setup(
             conf::WindowSetup::default()
                 .title("BestDamnSchackMonitor (BDSM)") // Set window title
-                .icon("/icon.png"), // Set application icon
+                .icon("/datasektionen.png"), // Set application icon
         )
         .window_mode(
             conf::WindowMode::default()
