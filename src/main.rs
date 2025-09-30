@@ -118,6 +118,7 @@ struct AppState {
     sprites: HashMap<char, graphics::Image>, // For easy access to the apropriate PNGs
     game: Game,
     piece_picked_up: Vec<i32>,
+    debug: bool,
 }
 
 impl AppState {
@@ -128,6 +129,7 @@ impl AppState {
             sprites: AppState::load_sprites(ctx),
             game: Game::new(),
             piece_picked_up: vec![],
+            debug: false // change this if debug information is needed in GUI
         };
 
         Ok(state)
@@ -172,30 +174,69 @@ impl event::EventHandler<GameError> for AppState {
         graphics::clear(ctx, [0.5, 0.5, 0.5, 1.0].into());
 
         // create text representation
-        let state_text = graphics::Text::new(
+        let debug_text = graphics::Text::new(
             graphics::TextFragment::from(format!("Debug information:\n{:?}", self.game))
                 .scale(graphics::PxScale { x: 15.0, y: 15.0 }),
         );
 
+
+
         // get size of text
-        let text_dimensions = state_text.dimensions(ctx);
-        let text_position = [(SCREEN_SIZE.0 - text_dimensions.w as f32), (SCREEN_SIZE.1 - text_dimensions.h as f32)];
+        let debug_text_dimensions = debug_text.dimensions(ctx);
+        let debug_text_position = [(SCREEN_SIZE.0 - debug_text_dimensions.w as f32), (SCREEN_SIZE.1 - debug_text_dimensions.h as f32)];
         // create background rectangle with OFF BLACK coulouring
-        let background_box = graphics::Mesh::new_rectangle(
+        let debug_background_box = graphics::Mesh::new_rectangle(
             ctx,
             graphics::DrawMode::fill(),
             graphics::Rect::new(
-                text_position[0],
-                text_position[1],
-                text_dimensions.w as f32 + 16.0,
-                text_dimensions.h as f32,
+                debug_text_position[0],
+                debug_text_position[1],
+                debug_text_dimensions.w as f32 + 16.0,
+                debug_text_dimensions.h as f32,
             ),
             [33.0/255.0, 33.0/255.0, 33.0/255.0, 1.0].into(),
         )?;
-
-        // draw background
-        graphics::draw(ctx, &background_box, graphics::DrawParam::default())
+        if self.debug {
+            // draw background
+            graphics::draw(ctx, &debug_background_box, graphics::DrawParam::default())
             .expect("Failed to draw background.");
+        }
+        let restart_text = graphics::Text::new(
+            graphics::TextFragment::from("[RESTART]")
+                    .scale(graphics::PxScale{x: 30.0, y: 30.0}),
+        );
+        let restart_text_dimensions = restart_text.dimensions(ctx);
+        let restart_text_position = [(GRID_CELL_SIZE.0 as f32 * 11.0) - (restart_text_dimensions.w / 2.0), (GRID_CELL_SIZE.1 as f32 * 2.5) - (restart_text_dimensions.h / 2.0)];
+
+        // create Restart button
+        let restart_button = graphics::Mesh::new_rectangle(
+            ctx,
+            graphics::DrawMode::fill(),
+            graphics::Rect::new(
+                GRID_CELL_SIZE.0 as f32 * 10.0,
+                GRID_CELL_SIZE.1 as f32 * 2.0,
+                (GRID_CELL_SIZE.0 * 2).into(),
+                GRID_CELL_SIZE.1.into(),
+            ),
+            [33.0/255.0, 33.0/255.0, 33.0/255.0, 1.0].into(),
+        )?;
+        graphics::draw(ctx, &restart_button, graphics::DrawParam::default()).expect("Failed to draw restart button background.");
+
+        // draw [RESTART] text
+
+        const F7: f32 = 0.96862745;
+            graphics::draw(
+                ctx,
+                
+                &restart_text,
+                graphics::DrawParam::default()
+                    .color([F7, F7, F7, 1.0].into())
+                    .dest(ggez::mint::Point2 {
+                        x: restart_text_position[0],
+                        y: restart_text_position[1],
+                    }),
+            )
+            .expect("Failed to draw restart text.");
 
         // draw grid
         for row in 0..8 {
@@ -292,24 +333,35 @@ impl event::EventHandler<GameError> for AppState {
                 }
             }
         }
-        // draw text with off white colouring and center position
-        const F7: f32 = 0.96862745;
-        graphics::draw(
-            ctx,
-            
-            &state_text,
-            graphics::DrawParam::default()
-                .color([F7, F7, F7, 1.0].into())
-                .dest(ggez::mint::Point2 {
-                    x: text_position[0],
-                    y: text_position[1],
-                }),
-        )
-        .expect("Failed to draw text.");
+        
+        // Draw Restart button text
+        
+        
+        // draw debug text with off white colouring and center position
+        if self.debug {
+            const F7: f32 = 0.96862745;
+            graphics::draw(
+                ctx,
+                
+                &debug_text,
+                graphics::DrawParam::default()
+                    .color([F7, F7, F7, 1.0].into())
+                    .dest(ggez::mint::Point2 {
+                        x: debug_text_position[0],
+                        y: debug_text_position[1],
+                    }),
+            )
+            .expect("Failed to draw text.");
+        }
+
+
+
+
+
+
 
         // render updated graphics
         graphics::present(ctx).expect("Failed to update graphics.");
-
         Ok(())
     }
 
@@ -339,7 +391,9 @@ impl event::EventHandler<GameError> for AppState {
                     self.piece_picked_up.retain(|_| false); //empty the vector
                 }
             } else {
-                // TODO: Implement other buttons here
+                if (board_pos_x == 10 || board_pos_x == 11) && board_pos_y == 2 {
+                    self.game = Game::new();
+                }
             }
         }
     }
