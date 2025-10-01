@@ -354,8 +354,8 @@ impl event::EventHandler<GameError> for AppState {
                 for col in 0..8 {
                     if col == self.piece_picked_up[0] && row == self.piece_picked_up[1] {
                         // let mouse_position = mouse::position(ctx);
-                        let x_pos = mouse_position.x - 20.0;
-                        let y_pos = mouse_position.y - 20.0;
+                        let x_pos = mouse_position.x - 45.0;
+                        let y_pos = mouse_position.y - 45.0;
                         graphics::draw(
                             ctx,
                             self.sprites.get(&self.game.board[row as usize][col as usize]).unwrap(),
