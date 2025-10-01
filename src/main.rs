@@ -423,7 +423,7 @@ impl event::EventHandler<GameError> for AppState {
                     let algebraic_coordinate_source = get_algebraic_notation(self.piece_picked_up[0], self.piece_picked_up[1]);
                     let algebraic_coordinate_target  = get_algebraic_notation(board_pos_x, board_pos_y);
                     let action = format!("{} {}", algebraic_coordinate_source, algebraic_coordinate_target);
-                    println!("Action taken: {}", action);
+                    println!("Action taken: '{}'", action);
                     self.game.update_fen(game_turn(self.game.fen.clone(), action));
                     self.piece_picked_up.retain(|_| false); //empty the vector
                 }
