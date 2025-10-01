@@ -418,7 +418,9 @@ impl event::EventHandler<GameError> for AppState {
             if board_pos_x <= 7 { // this means that the click was within board boundaries
                 println!("x coordinate: {}, y coordinate: {}, algebraic notation: {}", board_pos_x, board_pos_y, get_algebraic_notation(board_pos_x, board_pos_y));
                 if self.piece_picked_up.is_empty() { // This means a piece hasnt been picked up
-                    self.piece_picked_up = vec![board_pos_x, board_pos_y]; // set piece picked up flag
+                    if self.game.board[board_pos_y as usize][board_pos_x as usize] != '*' {
+                        self.piece_picked_up = vec![board_pos_x, board_pos_y]; // set piece picked up flag
+                    }
                 } else { // only run if a piece has been picked up
                     let algebraic_coordinate_source = get_algebraic_notation(self.piece_picked_up[0], self.piece_picked_up[1]);
                     let algebraic_coordinate_target  = get_algebraic_notation(board_pos_x, board_pos_y);
