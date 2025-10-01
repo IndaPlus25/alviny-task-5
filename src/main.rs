@@ -233,18 +233,47 @@ impl event::EventHandler<GameError> for AppState {
         // draw [RESTART] text
 
         const F7: f32 = 0.96862745;
-            graphics::draw(
-                ctx,
-                
-                &restart_text,
-                graphics::DrawParam::default()
-                    .color([F7, F7, F7, 1.0].into())
-                    .dest(ggez::mint::Point2 {
-                        x: restart_text_position[0],
-                        y: restart_text_position[1],
-                    }),
-            )
-            .expect("Failed to draw restart text.");
+        graphics::draw(
+            ctx,
+            
+            &restart_text,
+            graphics::DrawParam::default()
+                .color([F7, F7, F7, 1.0].into())
+                .dest(ggez::mint::Point2 {
+                    x: restart_text_position[0],
+                    y: restart_text_position[1],                    
+                }),
+        )
+        .expect("Failed to draw restart text.");
+
+        // Draw turn indicator text 
+        let mut turn_indicator = String::new();
+        match self.game.turn {
+            'w' => turn_indicator = "White".to_string(),
+            'b' => turn_indicator = "Black".to_string(),
+            _ => panic!("Oh my goodness! This color does not exist!")
+        }
+        let turn_indicator_text = graphics::Text::new(
+            graphics::TextFragment::from(format!(
+                "It is {}'s turn.",
+                turn_indicator,
+            )).scale(graphics::PxScale {x: 30.0, y: 30.0})
+        );
+        // let turn_indicator_text_dimensions = turn_indicator_text.dimensions(ctx);
+        let turn_indicator_text_position = [(GRID_CELL_SIZE.0 as f32 * 9.5), (GRID_CELL_SIZE.1 as f32 * 3.5)];
+                graphics::draw(
+            ctx,
+            
+            &turn_indicator_text,
+            graphics::DrawParam::default()
+                .color([F7, F7, F7, 1.0].into())
+                .dest(ggez::mint::Point2 {
+                    x: turn_indicator_text_position[0],
+                    y: turn_indicator_text_position[1],                    
+                }),
+        )
+        .expect("Failed to draw restart text.");
+
 
         // draw grid
         for row in 0..8 {
