@@ -170,6 +170,7 @@ impl event::EventHandler<GameError> for AppState {
 
     /// Draw interface, i.e. draw game board
     fn draw(&mut self, ctx: &mut Context) -> GameResult {
+        let mouse_position = mouse::position(ctx);
         // clear interface with gray background colour
         graphics::clear(ctx, [0.5, 0.5, 0.5, 1.0].into());
 
@@ -209,6 +210,12 @@ impl event::EventHandler<GameError> for AppState {
         let restart_text_position = [(GRID_CELL_SIZE.0 as f32 * 11.0) - (restart_text_dimensions.w / 2.0), (GRID_CELL_SIZE.1 as f32 * 2.5) - (restart_text_dimensions.h / 2.0)];
 
         // create Restart button
+        let mut color = [33.0/255.0, 33.0/255.0, 33.0/255.0, 1.0];
+        if mouse_position.x >= GRID_CELL_SIZE.0 as f32 * 10.0 && mouse_position.x <= GRID_CELL_SIZE.0 as f32 * 12.0 &&
+            mouse_position.y >= GRID_CELL_SIZE.1 as f32 * 2.0 && mouse_position.y <= GRID_CELL_SIZE.1 as f32 * 3.0 {
+                color = [153.0/255.0, 153.0/255.0, 153.0/255.0, 1.0]
+            }
+
         let restart_button = graphics::Mesh::new_rectangle(
             ctx,
             graphics::DrawMode::fill(),
@@ -218,8 +225,9 @@ impl event::EventHandler<GameError> for AppState {
                 (GRID_CELL_SIZE.0 * 2).into(),
                 GRID_CELL_SIZE.1.into(),
             ),
-            [33.0/255.0, 33.0/255.0, 33.0/255.0, 1.0].into(),
+            color.into(),
         )?;
+
         graphics::draw(ctx, &restart_button, graphics::DrawParam::default()).expect("Failed to draw restart button background.");
 
         // draw [RESTART] text
@@ -316,7 +324,7 @@ impl event::EventHandler<GameError> for AppState {
             for row in 0..8 {
                 for col in 0..8 {
                     if col == self.piece_picked_up[0] && row == self.piece_picked_up[1] {
-                        let mouse_position = mouse::position(ctx);
+                        // let mouse_position = mouse::position(ctx);
                         let x_pos = mouse_position.x - 20.0;
                         let y_pos = mouse_position.y - 20.0;
                         graphics::draw(
